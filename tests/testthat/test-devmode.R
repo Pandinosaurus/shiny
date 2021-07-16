@@ -11,13 +11,17 @@ test_that("devmode can not be turned on while testing", {
 
 test_that("devmode can be turned on while _testing_ is disabled and check messages", {
 
+  skip_if_not_installed("rlang", "0.4.11.9000")
+
   # disable all existing options
   withr::local_options(list(
     shiny.devmode = NULL,
     shiny.devmode.verbose = NULL,
     shiny.autoreload = NULL,
     shiny.minified = NULL,
-    shiny.fullstacktrace = NULL
+    shiny.fullstacktrace = NULL,
+    # force inform to always generate signal
+    rlib_message_verbosity = "verbose"
   ))
   # "turn off" testing to allow for devmode to activate
   withr::local_envvar(list(
@@ -32,41 +36,11 @@ test_that("devmode can be turned on while _testing_ is disabled and check messag
 
   with_devmode(TRUE, verbose = TRUE, {
     expect_equal(in_devmode(), TRUE)
+    expect_message(devmode_inform("custom message here"), "shiny devmode - ")
 
-    # if in devmode...
-
-    capture_message <- function(code) {
-      ret <- NULL
-      withCallingHandlers(
-        code,
-        message = function(m) {
-          ret <<- m$message
-        }
-      )
-      ret
-    }
-
-    expect_inform <- function(code, msg) {
-      msg_output <- capture_message(code)
-      # due to inform not always signaling as `.frequency = "regularly"`...
-      if (length(msg_output) > 0) {
-        expect_match(msg_output, msg, fixed = TRUE)
-      }
-    }
-
-    expect_inform(
-      devmode_inform("custom message here"),
-      "shiny devmode - "
-    )
-
-    expect_devmode_option <- function(key, val, msg, ...) {
-      expect_inform(
-        {
-          devmode_val <- get_devmode_option(key, "default", ...)
-        },
-        msg
-      )
-      expect_equal(devmode_val, val)
+    expect_devmode_option <- function(key, expected, msg, ...) {
+      expect_message(val <- get_devmode_option(key, ...), msg)
+      expect_equal(val, expected)
     }
 
     expect_devmode_option("shiny.autoreload", TRUE, "Turning on shiny autoreload")

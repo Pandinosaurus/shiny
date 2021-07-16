@@ -1,4 +1,4 @@
-#' @include utils.R stack.R
+#' @include utils.R
 NULL
 
 #' Web Application Framework for R
@@ -8,7 +8,7 @@ NULL
 #' prebuilt widgets make it possible to build beautiful, responsive, and
 #' powerful applications with minimal effort.
 #'
-#' The Shiny tutorial at <http://shiny.rstudio.com/tutorial/> explains
+#' The Shiny tutorial at <https://shiny.rstudio.com/tutorial/> explains
 #' the framework in depth, walks you through building a simple application, and
 #' includes extensive annotated examples.
 #'
@@ -193,6 +193,14 @@ workerId <- local({
 #'   An environment for app authors and module/package authors to store whatever
 #'   session-specific data they want.
 #' }
+#' \item{user}{
+#'   User's log-in information. Useful for identifying users on hosted platforms
+#'   such as RStudio Connect and Shiny Server.
+#' }
+#' \item{groups}{
+#'   The `user`'s relevant group information. Useful for determining what
+#'   privileges the user should or shouldn't have.
+#' }
 #' \item{resetBrush(brushId)}{
 #'   Resets/clears the brush with the given `brushId`, if it exists on
 #'   any `imageOutput` or `plotOutput` in the app.
@@ -280,7 +288,7 @@ NULL
 #'
 #' The `NS` function creates namespaced IDs out of bare IDs, by joining
 #' them using `ns.sep` as the delimiter. It is intended for use in Shiny
-#' modules. See <http://shiny.rstudio.com/articles/modules.html>.
+#' modules. See <https://shiny.rstudio.com/articles/modules.html>.
 #'
 #' Shiny applications use IDs to identify inputs and outputs. These IDs must be
 #' unique within an application, as accidentally using the same input/output ID
@@ -297,7 +305,7 @@ NULL
 #' @param id The id string to be namespaced (optional).
 #' @return If `id` is missing, returns a function that expects an id string
 #'   as its only argument and returns that id with the namespace prepended.
-#' @seealso <http://shiny.rstudio.com/articles/modules.html>
+#' @seealso <https://shiny.rstudio.com/articles/modules.html>
 #' @export
 NS <- function(namespace, id = NULL) {
   if (length(namespace) == 0)
@@ -335,8 +343,8 @@ ShinySession <- R6Class(
     websocket = 'ANY',
     invalidatedOutputValues = 'Map',
     invalidatedOutputErrors = 'Map',
-    inputMessageQueue = list(), # A list of inputMessages to send when flushed
-    cycleStartActionQueue = list(), # A list of actions to perform to start a cycle
+    inputMessageQueue = 'fastqueue',     # A list of inputMessages to send when flushed
+    cycleStartActionQueue = 'fastqueue', # A list of actions to perform to start a cycle
     .outputs = list(),          # Keeps track of all the output observer objects
     .outputOptions = list(),     # Options for each of the output observer objects
     progressKeys = 'character',
@@ -614,9 +622,8 @@ ShinySession <- R6Class(
     startCycle = function() {
       # TODO: This should check for busyCount == 0L, and remove the checks from
       # the call sites
-      if (length(private$cycleStartActionQueue) > 0) {
-        head <- private$cycleStartActionQueue[[1L]]
-        private$cycleStartActionQueue <- private$cycleStartActionQueue[-1L]
+      if (private$cycleStartActionQueue$size() > 0) {
+        head <- private$cycleStartActionQueue$remove()
 
         # After we execute the current cycleStartAction (head), there may be
         # more items left on the queue. If the current busyCount > 0, then that
@@ -635,7 +642,7 @@ ShinySession <- R6Class(
         # busyCount, it's possible we're calling startCycle spuriously; that's
         # OK, it's essentially a no-op in that case.
         on.exit({
-          if (private$busyCount == 0L && length(private$cycleStartActionQueue) > 0L) {
+          if (private$busyCount == 0L && private$cycleStartActionQueue$size() > 0L) {
             later::later(function() {
               if (private$busyCount == 0L) {
                 private$startCycle()
@@ -673,6 +680,8 @@ ShinySession <- R6Class(
       self$closed <- FALSE
       # TODO: Put file upload context in user/app-specific dir if possible
 
+      private$inputMessageQueue     <- fastmap::fastqueue()
+      private$cycleStartActionQueue <- fastmap::fastqueue()
       private$invalidatedOutputValues <- Map$new()
       private$invalidatedOutputErrors <- Map$new()
       private$fileUploadContext <- FileUploadContext$new()
@@ -683,7 +692,7 @@ ShinySession <- R6Class(
       private$.input      <- ReactiveValues$new(dedupe = FALSE, label = "input")
       private$.clientData <- ReactiveValues$new(dedupe = TRUE, label = "clientData")
       private$timingRecorder <- ShinyServerTimingRecorder$new()
-      self$progressStack <- Stack$new()
+      self$progressStack <- fastmap::faststack()
       self$files <- Map$new()
       self$downloads <- Map$new()
       self$userData <- new.env(parent = emptyenv())
@@ -1202,7 +1211,7 @@ ShinySession <- R6Class(
           length(private$progressKeys) != 0 ||
           length(private$invalidatedOutputValues) != 0 ||
           length(private$invalidatedOutputErrors) != 0 ||
-          length(private$inputMessageQueue) != 0
+          private$inputMessageQueue$size() != 0
         )
       }
 
@@ -1234,8 +1243,8 @@ ShinySession <- R6Class(
         private$invalidatedOutputValues <- Map$new()
         errors <- as.list(private$invalidatedOutputErrors)
         private$invalidatedOutputErrors <- Map$new()
-        inputMessages <- private$inputMessageQueue
-        private$inputMessageQueue <- list()
+        inputMessages <- private$inputMessageQueue$as_list()
+        private$inputMessageQueue$reset()
 
         if (isTRUE(private$testMode)) {
           private$storeOutputValues(mergeVectors(values, errors))
@@ -1253,7 +1262,7 @@ ShinySession <- R6Class(
     # does not guarantee) inputs and reactive values from changing underneath
     # async observers as they run.
     cycleStartAction = function(callback) {
-      private$cycleStartActionQueue <- c(private$cycleStartActionQueue, list(callback))
+      private$cycleStartActionQueue$add(callback)
       # If no observers are running in this session, we're safe to proceed.
       # Otherwise, startCycle() will be called later, via decrementBusyCount().
       if (private$busyCount == 0L) {
@@ -1384,8 +1393,7 @@ ShinySession <- R6Class(
     sendInputMessage = function(inputId, message) {
       data <- list(id = inputId, message = message)
 
-      # Add to input message queue
-      private$inputMessageQueue[[length(private$inputMessageQueue) + 1]] <- data
+      private$inputMessageQueue$add(data)
       # Needed so that Shiny knows to actually flush the input message queue
       self$requestFlush()
     },
@@ -2119,18 +2127,6 @@ ShinySession <- R6Class(
         })
       }
     }
-  ),
-  active = list(
-    session = function() {
-      shinyDeprecated(
-        "0.11.1", "shinysession$session",
-        details = paste0(
-          "Attempted to access deprecated shinysession$session object. ",
-          "Please just access the shinysession object directly."
-        )
-      )
-      self
-    }
   )
 )
 
@@ -2167,7 +2163,7 @@ ShinySession <- R6Class(
   if (getOption("shiny.allowoutputreads", FALSE)) {
     .subset2(x, 'impl')$getOutput(name)
   } else {
-    stop("Reading from shinyoutput object is not allowed.")
+    rlang::abort(paste0("Can't read output '", name, "'"))
   }
 }
 
@@ -2176,12 +2172,12 @@ ShinySession <- R6Class(
 
 #' @export
 `[.shinyoutput` <- function(values, name) {
-  stop("Single-bracket indexing of shinyoutput object is not allowed.")
+  rlang::abort("Can't index shinyoutput with `[`.")
 }
 
 #' @export
 `[<-.shinyoutput` <- function(values, name, value) {
-  stop("Single-bracket indexing of shinyoutput object is not allowed.")
+  rlang::abort("Can't index shinyoutput with `[[`.")
 }
 
 #' Set options for an output object.

@@ -247,8 +247,14 @@ utils::globalVariables(".GenericCallEnv", add = TRUE)
 #'
 #' @section Developing render functions for caching:
 #'
-#'   If you've implemented your own `render*()` function, you may need to
-#'   provide a `cacheHint` to [createRenderFunction()] (or
+#'   If you've implemented your own `render*()` function, it may just work with
+#'   `bindCache()`, but it is possible that you will need to make some
+#'   modifications. These modifications involve helping `bindCache()` avoid
+#'   cache collisions, dealing with internal state that may be set by the,
+#'   `render` function, and modifying the data as it goes in and comes out of
+#'   the cache.
+#'
+#'   You may need to provide a `cacheHint` to [createRenderFunction()] (or
 #'   [htmlwidgets::shinyRenderWidget()], if you've authored an htmlwidget) in
 #'   order for `bindCache()` to correctly compute a cache key.
 #'
@@ -288,10 +294,10 @@ utils::globalVariables(".GenericCallEnv", add = TRUE)
 #'   for `renderPrint()`. Unlike `renderText()`, it wraps the user-provided
 #'   expression in another function, before passing it to [markRenderFunction()]
 #'   (instead of [createRenderFunction()]). Because the user code is wrapped in
-#'   another function, markRenderFunction() is not able to automatically extract
-#'   the user-provided code and use it in the cache key. Instead, `renderPrint`
-#'   calls `markRenderFunction()`, it explicitly passes along a `cacheHint`,
-#'   which includes a label and the original user expression.
+#'   another function, `markRenderFunction()` is not able to automatically
+#'   extract the user-provided code and use it in the cache key. Instead,
+#'   `renderPrint` calls `markRenderFunction()`, it explicitly passes along a
+#'   `cacheHint`, which includes a label and the original user expression.
 #'
 #'   In general, if you need to provide a `cacheHint`, it is best practice to
 #'   provide a `label` id, the user's `expr`, as well as any other arguments
@@ -315,6 +321,17 @@ utils::globalVariables(".GenericCallEnv", add = TRUE)
 #'   }
 #'   ```
 #'
+#'   If your `render` function sets any internal state, you may find it useful
+#'   in your call to [createRenderFunction()] or [markRenderFunction()] to use
+#'   the `cacheWriteHook` and/or `cacheReadHook` parameters. These hooks are
+#'   functions that run just before the object is stored in the cache, and just
+#'   after the object is retrieved from the cache. They can modify the data
+#'   that is stored and retrieved; this can be useful if extra information needs
+#'   to be stored in the cache. They can also be used to modify the state of the
+#'   application; for example, it can call [createWebDependency()] to make
+#'   JS/CSS resources available if the cached object is loaded in a different R
+#'   process. (See the source of `htmlwidgets::shinyRenderWidget` for an example
+#'   of this.)
 #'
 #' @section Uncacheable objects:
 #'
@@ -470,7 +487,7 @@ bindCache.reactiveExpr <- function(x, ..., cache = "app") {
   valueFunc <- reactive_get_value_func(x)
   # Hash cache hint now -- this will be added to the key later on, to reduce the
   # chance of key collisions with other cachedReactives.
-  cacheHint <- digest(extractCacheHint(x), algo = "spookyhash")
+  cacheHint <- rlang::hash(extractCacheHint(x))
   valueFunc <- wrapFunctionLabel(valueFunc, "cachedReactiveValueFunc", ..stacktraceon = TRUE)
 
   # Don't hold on to the reference for x, so that it can be GC'd
@@ -500,7 +517,7 @@ bindCache.shiny.render.function <- function(x, ..., cache = "app") {
 
   keyFunc <- quos_to_func(enquos0(...))
 
-  cacheHint <- digest(extractCacheHint(x), algo = "spookyhash")
+  cacheHint <- rlang::hash(extractCacheHint(x))
 
   cacheWriteHook <- attr(x, "cacheWriteHook", exact = TRUE) %||% identity
   cacheReadHook  <- attr(x, "cacheReadHook",  exact = TRUE) %||% identity
@@ -658,7 +675,7 @@ generateCacheFun <- function(
   ...
 ) {
   function(cacheKeyResult) {
-    key_str <- digest(list(cacheKeyResult, cacheHint), algo = "spookyhash")
+    key_str <- rlang::hash(list(cacheKeyResult, cacheHint))
     res <- cache$get(key_str)
 
     # Case 1: cache hit

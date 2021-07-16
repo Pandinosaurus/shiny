@@ -7,7 +7,6 @@
 #' @importFrom fastmap fastmap
 #' @importFrom promises %...!%
 #' @importFrom promises %...>%
-#' @importFrom digest digest
 #' @importFrom promises
 #'    promise promise_resolve promise_reject is.promising
 #'    as.promise
@@ -15,7 +14,7 @@
 #'    quo enquo as_function get_expr get_env new_function enquos
 #'    eval_tidy expr pairlist2 new_quosure enexpr as_quosure is_quosure inject
 #'    enquos0 zap_srcref %||% is_na
-#'    is_false
+#'    is_false list2
 #'    missing_arg is_missing maybe_missing
 #' @importFrom ellipsis
 #'    check_dots_empty check_dots_unnamed

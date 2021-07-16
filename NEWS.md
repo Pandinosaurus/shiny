@@ -1,6 +1,73 @@
-
-shiny 1.5.0.9000
+shiny 1.6.0.9000
 ================
+
+## Full changelog
+
+### Breaking changes
+
+* The `format` and `locale` arguments to `sliderInput()` have been removed. They have been deprecated since 0.10.2.2 (released on 2014-12-08).
+
+* Closed #3403: `insertTab()`'s `position` parameter now defaults to `"after"` instead of `"before"`. This has the benefit of allowing us to fix a bug in positioning when `target = NULL`, but has the drawback of changing the default behavior when `target` is not `NULL`. (#3404)
+
+### New features and improvements
+
+* Bootstrap 5 support. (#3410 and rstudio/bslib#304)
+  * As explained [here](https://rstudio.github.io/bslib/index.html#basic-usage), to opt-in to Bootstrap 5, provide `bslib::bs_theme(version = 5)` to a page layout function with a `theme` argument (e.g., `fluidPage()`, `navbarPage()`, etc).
+
+* Closed #3322, #3313, #1823, #3321, #3320, #1928, and #2310: Various improvements to `navbarPage()`, `tabsetPanel()`, `tabPanel()`, `navbarMenu()`, etc. Also, these functions are now powered by the `{bslib}` package's new `nav()` API (consider using `{bslib}`'s API to create better looking and more fully featured navs). (#3388)
+
+* All uses of `list(...)` have been replaced with `rlang::list2(...)`. This means that you can use trailing `,` without error and use rlang's `!!!` operator to "splice" a list of argument values into `...`. We think this'll be particularly useful for passing a list of `tabPanel()` to their consumers (i.e., `tabsetPanel()`, `navbarPage()`, etc). For example, `tabs <- list(tabPanel("A", "a"), tabPanel("B", "b")); navbarPage(!!!tabs)`. (#3315 and #3328)
+
+* `installExprFunction()` and `exprToFunction()` are now able to handle quosures, so `render`-functions which call these functions can now understand quosures, when they are called using `rlang::inject()`. This also means that `render` function no longer need `env` and `quoted` parameters; that information can be embedded into a quosure which is then passed to the `render` function. Additionally, the `getQuosure()` function was added, which makes it easier for developers to create `render` functions which understand quosures. Better documentation was added for how to create `render` functions. (#3462, #3466)
+
+* `icon(lib="fontawesome")` is now powered by the `{fontawesome}` package, which will make it easier to use the latest FA icons in the future (by updating the `{fontawesome}` package). (#3302)
+
+* Closed #3397: `renderPlot()` new uses `ggplot2::get_alt_text()` to inform an `alt` text default (for `{ggplot2}` plots). (#3398)
+
+* `modalDialog()` gains support for `size = "xl"`. (#3410)
+
+* Addressed #2521: Updated the list of TCP ports that will be rejected by default in runapp.R, adding 5060, 5061 and 6566. Added documentation describing the port range (3000:8000) and which ports are rejected. (#3456)
+
+### Other improvements
+
+* Shiny's core JavaScript code was converted to TypeScript. For the latest development information, please see the [README.md in `./srcts`](https://github.com/rstudio/shiny/tree/master/srcts). (#3296)
+
+* Switched from `digest::digest()` to `rlang::hash()` for hashing. (#3264)
+
+* Switched from internal `Stack` class to `fastmap::faststack()`, and used `fastmap::fastqueue()`. (#3176)
+
+* Some long-deprecated functions and function parameters were removed. (#3137)
+
+### Bug fixes
+
+* Closed #3345: Shiny now correctly renders `htmltools::htmlDependency()`(s) with a `list()` of `script` attributes when used in a dynamic UI context. This fairly new `htmlDependency()` feature was added in `{htmltools}` v0.5.1. (#3395)
+
+* Closed #3374: `quoToFunction()` now works correctly with nested quosures; and as a result, quasi-quotation with rendering function (e.g., `renderPrint()`, `renderPlot()`, etc) now works as expected with nested quosures. (#3373) 
+
+* Exported `register_devmode_option()`. This method was described in the documentation for `devmode()` but was never exported. See `?devmode()` for more details on how to register Shiny Developer options using `register_devmode_option()`. (#3364)
+
+### Library updates
+
+* Closed #3286: Updated to Font-Awesome 5.15.2. (#3288)
+
+* Updated to jQuery 3.6.0. (#3311)
+
+shiny 1.6.0
+===========
+
+This release focuses on improvements in three main areas:
+
+1. Better theming (and Bootstrap 4) support:
+  * The `theme` argument of `fluidPage()`, `navbarPage()`, and `bootstrapPage()` all now understand `bslib::bs_theme()` objects, which can be used to opt-into Bootstrap 4, use any Bootswatch theme, and/or implement custom themes without writing any CSS.
+  * The `session` object now includes `$setCurrentTheme()` and `$getCurrentTheme()` methods to dynamically update (or obtain) the page's `theme` after initial load, which is useful for things such as [adding a dark mode switch to an app](https://rstudio.github.io/bslib/articles/theming.html#dynamic-shiny) or some other "real-time" theming tool like `bslib::bs_themer()`.
+  * For more details, see [`{bslib}`'s website](https://rstudio.github.io/bslib/)
+
+2. Caching of `reactive()` and `render*()` (e.g. `renderText()`, `renderTable()`, etc) expressions.
+  * Such expressions automatically cache their _most recent value_, which helps to avoid redundant computation within a single "flush" of reactivity. The new `bindCache()` function can be used to cache _all previous values_ (as long as they fit in the cache). This cache may be optionally scoped within and/or across user sessions, possibly leading to huge performance gains, especially when deployed at scale across user sessions.
+  * For more details, see `help(bindCache, package = "shiny")`
+
+3. Various improvements to accessibility for screen-reader and keyboard users.
+  * For more details, see the accessibility section below.
 
 ## Full changelog
 
@@ -280,7 +347,7 @@ shiny 1.3.0
 shiny 1.2.0
 ===========
 
-This release features plot caching, an important new tool for improving performance and scalability. Using `renderCachedPlot` in place of `renderPlot` can greatly improve responsiveness for apps that show the same plot many times (for example, a dashboard or report where all users view the same data). Shiny gives you a fair amount of control in where the cache is stored and how cached plots are invalidated, so be sure to read [this article](http://shiny.rstudio.com/articles/plot-caching.html) to get the most out of this feature.
+This release features plot caching, an important new tool for improving performance and scalability. Using `renderCachedPlot` in place of `renderPlot` can greatly improve responsiveness for apps that show the same plot many times (for example, a dashboard or report where all users view the same data). Shiny gives you a fair amount of control in where the cache is stored and how cached plots are invalidated, so be sure to read [this article](https://shiny.rstudio.com/articles/plot-caching.html) to get the most out of this feature.
 
 ## Full changelog
 
@@ -704,7 +771,7 @@ This is a maintenance release of Shiny, with some bug fixes and minor new featur
 
 * Restored file inputs are now copied on restore, so that the restored application can't modify the bookmarked file. (#1370)
 
-* Added support for plot interaction in the development version of ggplot2, 2.1.0.9000. Also added support for ggplot2 plots with `coord_flip()` (in the development version of ggplot2). ([hadley/ggplot2#1781](https://github.com/hadley/ggplot2/issues/1781), #1392)
+* Added support for plot interaction in the development version of ggplot2, 2.1.0.9000. Also added support for ggplot2 plots with `coord_flip()` (in the development version of ggplot2). ([hadley/ggplot2#1781](https://github.com/tidyverse/ggplot2/issues/1781), #1392)
 
 
 ### Bug fixes
@@ -736,7 +803,7 @@ Shiny now supports bookmarkable state: users can save the state of an applicatio
 **_Important note_:**
 > Saved-to-server bookmarking currently works with Shiny Server Open Source. Support on Shiny Server Pro, RStudio Connect, and shinyapps.io is under development and testing. However, URL-encoded bookmarking works on all hosting platforms.
 
-See [this article](http://shiny.rstudio.com/articles/bookmarking-state.html) to get started with bookmarkable state. There is also an [advanced-level article](http://shiny.rstudio.com/articles/advanced-bookmarking.html) (for apps that have a complex state), and [a modules article](http://shiny.rstudio.com/articles/bookmarking-modules.html) that details how to use bookmarking in conjunction with modules.
+See [this article](https://shiny.rstudio.com/articles/bookmarking-state.html) to get started with bookmarkable state. There is also an [advanced-level article](https://shiny.rstudio.com/articles/advanced-bookmarking.html) (for apps that have a complex state), and [a modules article](https://shiny.rstudio.com/articles/bookmarking-modules.html) that details how to use bookmarking in conjunction with modules.
 
 ## Notifications
 
@@ -746,7 +813,7 @@ Shiny can now display notifications on the client browser by using the `showNoti
 <img src="http://shiny.rstudio.com/images/notification.png" alt="notification" width="50%"/>
 </p>
 
-[Here](http://shiny.rstudio.com/articles/notifications.html)'s our article about it, and the [reference documentation](http://shiny.rstudio.com/reference/shiny/latest/showNotification.html).
+[Here](https://shiny.rstudio.com/articles/notifications.html)'s our article about it, and the [reference documentation](https://shiny.rstudio.com/reference/shiny/latest/showNotification.html).
 
 ## Progress indicators
 
@@ -755,7 +822,7 @@ If your Shiny app contains computations that take a long time to complete, a pro
 **_Important note_:**
 > If you were already using progress bars and had customized them with your own CSS, you can add the `style = "old"` argument to your `withProgress()` call (or `Progress$new()`). This will result in the same appearance as before. You can also call `shinyOptions(progress.style = "old")` in your app's server function to make all progress indicators use the old styling.
 
-To see new progress bars in action, see [this app](https://gallery.shinyapps.io/085-progress/) in the gallery. You can also learn more about this in [our article](http://shiny.rstudio.com/articles/progress.html) and in the reference documentation (either for the easier [`withProgress` functional API](http://shiny.rstudio.com/reference/shiny/latest/withProgress.html) or the more complicated, but more powerful, [`Progress` object-oriented API](http://shiny.rstudio.com/reference/shiny/latest/Progress.html).
+To see new progress bars in action, see [this app](https://gallery.shinyapps.io/085-progress/) in the gallery. You can also learn more about this in [our article](https://shiny.rstudio.com/articles/progress.html) and in the reference documentation (either for the easier [`withProgress` functional API](https://shiny.rstudio.com/reference/shiny/latest/withProgress.html) or the more complicated, but more powerful, [`Progress` object-oriented API](https://shiny.rstudio.com/reference/shiny/latest/Progress.html).
 
 ## Reconnection
 
@@ -769,7 +836,7 @@ Shiny has now built-in support for displaying modal dialogs like the one below (
 <img src="http://shiny.rstudio.com/images/modal-dialog.png" alt="modal-dialog" width="50%"/>
 </p>
 
-To learn more about this, read [our article](http://shiny.rstudio.com/articles/modal-dialogs.html) and the [reference documentation](http://shiny.rstudio.com/reference/shiny/latest/modalDialog.html).
+To learn more about this, read [our article](https://shiny.rstudio.com/articles/modal-dialogs.html) and the [reference documentation](https://shiny.rstudio.com/reference/shiny/latest/modalDialog.html).
 
 ## `insertUI` and `removeUI`
 
@@ -777,13 +844,13 @@ Sometimes in a Shiny app, arbitrary HTML UI may need to be created on-the-fly in
 
 See [this simple demo app](https://gallery.shinyapps.io/111-insert-ui/) of how one could use `insertUI` and `removeUI` to insert and remove text elements using a queue. Also see [this other app](https://gallery.shinyapps.io/insertUI/) that demonstrates how to insert and remove a few common Shiny input objects. Finally, [this app](https://gallery.shinyapps.io/insertUI-modules/) shows how to dynamically insert modules using `insertUI`.
 
-For more, read [our article](http://shiny.rstudio.com/articles/dynamic-ui.html) about dynamic UI generation and the reference documentation about [`insertUI`](http://shiny.rstudio.com/reference/shiny/latest/insertUI.html) and [`removeUI`](http://shiny.rstudio.com/reference/shiny/latest/removeUI.html).
+For more, read [our article](https://shiny.rstudio.com/articles/dynamic-ui.html) about dynamic UI generation and the reference documentation about [`insertUI`](https://shiny.rstudio.com/reference/shiny/latest/insertUI.html) and [`removeUI`](https://shiny.rstudio.com/reference/shiny/latest/insertUI.html).
 
 ## Documentation for connecting to an external database
 
-Many Shiny users have asked about best practices for accessing external databases from their Shiny applications. Although database access has long been possible using various database connector packages in R, it can be challenging to use them robustly in the dynamic environment that Shiny provides. So far, it has been mostly up to application authors to find the appropriate database drivers and to discover how to manage the database connections within an application. In order to demystify this process, we wrote a series of articles ([first one here](http://shiny.rstudio.com/articles/overview.html)) that covers the basics of connecting to an external database, as well as some security precautions to keep in mind (e.g. [how to avoid SQL injection attacks](http://shiny.rstudio.com/articles/sql-injections.html)).
+Many Shiny users have asked about best practices for accessing external databases from their Shiny applications. Although database access has long been possible using various database connector packages in R, it can be challenging to use them robustly in the dynamic environment that Shiny provides. So far, it has been mostly up to application authors to find the appropriate database drivers and to discover how to manage the database connections within an application. In order to demystify this process, we wrote a series of articles ([first one here](https://shiny.rstudio.com/articles/overview.html)) that covers the basics of connecting to an external database, as well as some security precautions to keep in mind (e.g. [how to avoid SQL injection attacks](https://shiny.rstudio.com/articles/sql-injections.html)).
 
-There are a few packages that you should look at if you're using a relational database in a Shiny app: the `dplyr` and `DBI` packages (both featured in the article linked to above), and the brand new `pool` package, which provides a further layer of abstraction to make it easier and safer to use either `DBI` or `dplyr`. `pool` is not yet on CRAN. In particular, `pool` will take care of managing connections, preventing memory leaks, and ensuring the best performance. See this [`pool` basics article](http://shiny.rstudio.com/articles/pool-basics.html) and the [more advanced-level article](http://shiny.rstudio.com/articles/pool-advanced.html) if you're feeling adventurous! (Both of these articles contain Shiny app examples that use `DBI` to connect to an external MySQL database.) If you are more comfortable with `dplyr` than `DBI`, don't miss the article about the [integration of `pool` and `dplyr`](http://shiny.rstudio.com/articles/pool-dplyr.html).
+There are a few packages that you should look at if you're using a relational database in a Shiny app: the `dplyr` and `DBI` packages (both featured in the article linked to above), and the brand new `pool` package, which provides a further layer of abstraction to make it easier and safer to use either `DBI` or `dplyr`. `pool` is not yet on CRAN. In particular, `pool` will take care of managing connections, preventing memory leaks, and ensuring the best performance. See this [`pool` basics article](https://shiny.rstudio.com/articles/pool-basics.html) and the [more advanced-level article](https://shiny.rstudio.com/articles/pool-advanced.html) if you're feeling adventurous! (Both of these articles contain Shiny app examples that use `DBI` to connect to an external MySQL database.) If you are more comfortable with `dplyr` than `DBI`, don't miss the article about the [integration of `pool` and `dplyr`](https://shiny.rstudio.com/articles/pool-dplyr.html).
 
 If you're new to databases in the Shiny world, we recommend using `dplyr` and `pool` if possible. If you need greater control than `dplyr` offers (for example, if you need to modify data in the database or use transactions), then use `DBI` and `pool`. The `pool` package was introduced to make your life easier, but in no way constrains you, so we don't envision any situation in which you'd be better off *not* using it. The only caveat is that `pool` is not yet on CRAN, so you may prefer to wait for that.
 
@@ -791,11 +858,11 @@ If you're new to databases in the Shiny world, we recommend using `dplyr` and `p
 
 There are many more minor features, small improvements, and bug fixes than we can cover here, so we'll just mention a few of the more noteworthy ones (the full changelog, with links to all the relevant issues and pull requests, is right below this section):
 
-*    **Error Sanitization**: you now have the option to sanitize error messages; in other words, the content of the original error message can be suppressed so that it doesn't leak any sensitive information. To sanitize errors everywhere in your app, just add `options(shiny.sanitize.errors = TRUE)` somewhere in your app. Read [this article](http://shiny.rstudio.com/articles/sanitize-errors.html) for more, or play with the [demo app](https://gallery.shinyapps.io/110-error-sanitization/).
+*    **Error Sanitization**: you now have the option to sanitize error messages; in other words, the content of the original error message can be suppressed so that it doesn't leak any sensitive information. To sanitize errors everywhere in your app, just add `options(shiny.sanitize.errors = TRUE)` somewhere in your app. Read [this article](https://shiny.rstudio.com/articles/sanitize-errors.html) for more, or play with the [demo app](https://gallery.shinyapps.io/110-error-sanitization/).
 
 *    **Code Diagnostics**: if there is an error parsing `ui.R`, `server.R`, `app.R`, or `global.R`, Shiny will search the code for missing commas, extra commas, and unmatched braces, parens, and brackets, and will print out messages pointing out those problems. (#1126)
 
-*    **Reactlog visualization**: by default, the [`showReactLog()` function](http://shiny.rstudio.com/reference/shiny/latest/reactlog.html) (which brings up the reactive graph) also displays the time that each reactive and observer were active for:
+*    **Reactlog visualization**: by default, the [`showReactLog()` function](https://shiny.rstudio.com/reference/shiny/latest/reactlog.html) (which brings up the reactive graph) also displays the time that each reactive and observer were active for:
 
       <p align="center">
       <img src="http://shiny.rstudio.com/images/reactlog.png" alt="modal-dialog" width="75%"/>
@@ -811,7 +878,7 @@ There are many more minor features, small improvements, and bug fixes than we ca
       <img src="http://shiny.rstudio.com/images/render-table.png" alt="render-table" width="75%"/>
       </p>
 
-      For more, read our [short article](http://shiny.rstudio.com/articles/render-table.html) about this update, experiment with all the new features in this [demo app](https://gallery.shinyapps.io/109-render-table/), or check out the [reference documentation](http://shiny.rstudio.com/reference/shiny/latest/renderTable.html).
+      For more, read our [short article](https://shiny.rstudio.com/articles/render-table.html) about this update, experiment with all the new features in this [demo app](https://gallery.shinyapps.io/109-render-table/), or check out the [reference documentation](https://shiny.rstudio.com/reference/shiny/latest/renderTable.html).
 
 ## Full changelog
 
@@ -1138,7 +1205,7 @@ Shiny 0.11 switches away from the Bootstrap 2 web framework to the next version,
   * `updateSliderInput()` can now control the min, max, value, and step size of a slider. Previously, only the value could be controlled this way, and if you wanted to change other values, you needed to use Shiny's dynamic UI.
 
 
-*    If in your HTML you are using custom CSS classes that are specific to Bootstrap, you may need to update them for Bootstrap 3. See the Bootstrap [migration guide](http://getbootstrap.com/migration/).
+*    If in your HTML you are using custom CSS classes that are specific to Bootstrap, you may need to update them for Bootstrap 3. See the Bootstrap [migration guide](https://getbootstrap.com/migration/).
 
 
 If you encounter other migration issues, please let us know on the [shiny-discuss](https://groups.google.com/forum/#!forum/shiny-discuss) mailing list, or on the Shiny [issue tracker](https://github.com/rstudio/shiny/issues).
@@ -1331,7 +1398,7 @@ shiny 0.9.0
 
 * Added `theme` parameter to page building functions for specifying alternate bootstrap css styles.
 
-* Added `icon()` function for embedding icons from the [font awesome](http://fontawesome.io/) icon library
+* Added `icon()` function for embedding icons from the [font awesome](https://fontawesome.com) icon library
 
 * Added `makeReactiveBinding` function to turn a "regular" variable into a reactive one (i.e. reading the variable makes the current reactive context dependent on it, and setting the variable is a source of reactivity).
 

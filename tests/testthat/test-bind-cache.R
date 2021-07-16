@@ -923,6 +923,9 @@ test_that("bindCache visibility", {
 
 
 test_that("bindCache reactive visibility - async", {
+  # only test if promises handles visibility
+  skip_if_not_installed("promises", "1.1.1.9001")
+
   cache <- cachem::cache_mem()
   k <- reactiveVal(0)
   res <- NULL
@@ -994,7 +997,7 @@ test_that("bindCache renderFunction basic functionality", {
 # ==============================================================================
 test_that("Custom render functions that call installExprFunction", {
   # Combinations with `installExprFunction` or `quoToFunction` plus
-  # `markRenderFunction` or `createRenderFunction` should worjk.
+  # `markRenderFunction` or `createRenderFunction` should work.
 
   # The expressions passed into renderDouble below should be converted into this
   # function. We'll use this for comparison.
